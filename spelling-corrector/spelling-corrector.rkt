@@ -10,9 +10,11 @@
 // Imports
 
 import:
-  "map-ref.rkt"      : no_prefix
+  "map-ref.rkt":       no_prefix
   "racket-for.rkt":    no_prefix
-  racket/base        : prefix rkt
+  rhombus/macro: no_prefix
+               
+  racket/base:         prefix rkt
   "racket-regexp.rkt": prefix re
   "racket-string.rkt": prefix string
   "racket-file.rkt":   prefix file
@@ -56,7 +58,7 @@ fun findall(pattern, string): re.match_all(pattern, string)
 fun regexp(ss):   apply(re.pregexp, ss)
 fun open(path):   file.open(path)        // Note: path can't be renamed to file here
 fun read(a_port): port.to_string(a_port)
-fun stringify(x): if string.is_string(x) | x | string.from_char(x)
+fun stringify(x): if string.is_string(x) | x | string.from_char(x)                          
 
 // Problem: how to define the nary case?
 operator (a ++ b):
@@ -132,19 +134,16 @@ def known(words) :
 //    return set(deletes + transposes + replaces + inserts)
 
 def edits1(word):
-  def split(word,i) : [string.sub(word,0,i),string.sub(word,i,string.length(word))]
-  def ref(s,i) : string.ref(s,i)
-  def ok(s) : string.is_non_empty(s)
+  def ok(s)     : string.is_non_empty(s)
   def clean(xs) : rkt.filter((fun(x): x),xs)
-                      
-  def letters:    "abcdefghijklmnopqrstuvwxyz"
-  def splits:     for_list(i, list.range(string.length(word)+1), split(word,i))
-  def deletes:    for_list(s, splits,(fun(List(L,R)):  ok(R) && L++string.sub(R,1))(s))
-  def transposes: for_list(s, splits,(fun(List(L,R)):  string.length(R)>1  && L++ref(R,1)++ref(R,0)++string.sub(R,2))(s))
-  def replaces:   for_list(s, splits,(fun(List(L,R)):  ok(R) && for_list(c,letters,L++c++string.sub(R,1)))(s))
-  def inserts:    for_list(s, splits,(fun(List(L,R)):           for_list(c,letters,L++c++R))(s))
+  defs:
+    letters:    "abcdefghijklmnopqrstuvwxyz"
+    splits:     for_list(i, list.range(string.length(word)+1), [word[~to:i], word[~from:i]])
+    deletes:    for_list(s, splits,(fun(List(L,R)):                ok(R) && L++R[~from:1])(s))
+    transposes: for_list(s, splits,(fun(List(L,R)):  string.length(R)>1  && L++R[1]++R[0]++R[~from:2])(s))
+    replaces:   for_list(s, splits,(fun(List(L,R)):                ok(R) && for_list(c,letters,L++c++R[~from:1]))(s))
+    inserts:    for_list(s, splits,(fun(List(L,R)):                         for_list(c,letters,L++c++R))(s))
   set.from_list(clean(list.flatten([deletes, transposes, replaces, inserts])))
-
 
 // def edits2(word): 
 //    "All edits that are two edits away from `word`."
@@ -159,3 +158,4 @@ def edits2(word):
 
 // > correction("sumthing")
 // "something"
+
