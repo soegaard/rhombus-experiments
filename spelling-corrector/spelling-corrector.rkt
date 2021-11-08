@@ -10,7 +10,7 @@
 // Imports
 
 import:
-  // "map-ref.rkt"      : no_prefix  // todo: make "foo"[0] work
+  "map-ref.rkt"      : no_prefix
   "racket-for.rkt":    no_prefix
   racket/base        : prefix rkt
   "racket-regexp.rkt": prefix re
