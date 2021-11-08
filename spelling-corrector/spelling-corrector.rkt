@@ -21,6 +21,18 @@ import:
   "racket-list.rkt":   prefix list
   "racket-set.rkt":    prefix set
 
+// Extra Forms
+
+// Multiple definitions
+defn.macro '(defs:
+               $x: $y ...
+               ...):
+  '(:
+      def $x: $y ...
+      ...
+  )
+
+
 // Helpers
 
 val apply:   rkt.apply
