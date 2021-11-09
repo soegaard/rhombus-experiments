@@ -47,7 +47,7 @@
              #'tail)]
     [(_ ((~and head brackets) index) . tail)
      (define map-ref-id (or (syntax-local-static-info map #'#%map-ref)
-                            #'my-map-ref))
+                            #'map-ref))
      (define e (datum->syntax (quote-syntax here)
                               (list map-ref-id map #'(rhombus-expression index))
                               (span-srcloc map #'head)
@@ -66,10 +66,24 @@
      (parse-map-ref-or-set array stxes))
    'left))
 
-(define (my-map-ref map index)
+#;(define (my-map-ref map index)
   (if (string? map)
       (string-ref map index)
       (map-ref map index)))
+
+(define (string-ref* s i)
+  (cond
+    [(integer? i)
+     (string-ref s i)]
+    [(and (list? i) (= (length i) 2))
+     (define from (list-ref i 0))
+     (define to   (list-ref i 1))
+     (cond
+       [(and from to) (substring s from to)]
+       [from          (substring s from)]
+       [to            (substring s 0 to)])]
+    [else
+     (raise-argument-error 'string-ref* "expected a range")]))
 
 (define (map-ref map index)
   (cond
@@ -77,6 +91,7 @@
     [(list? map)   (list-ref map index)]
     [(hash? map)   (hash-ref map index)]
     [(set? map)    (hash-ref (set-ht map) index #f)]
+    [(string? map) (string-ref* map index)]               ; added [soegaard]
     [else
      (raise-argument-error 'my-map-ref "my-map?" map)]))
 
