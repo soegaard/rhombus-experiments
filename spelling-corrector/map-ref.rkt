@@ -96,5 +96,3 @@
      (raise-argument-error 'my-map-ref "my-map?" map)]))
 
 (define (tostring s i) (substring s 0 i))
-
-

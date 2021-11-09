@@ -195,4 +195,3 @@ def edits2(word):
 
 // > correction("sumthing")
 // "something"
-
