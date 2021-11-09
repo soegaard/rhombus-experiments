@@ -10,11 +10,14 @@
 // Imports
 
 import:
-  "map-ref.rkt":       no_prefix
+  "map-ref.rkt":       no_prefix // for dynamic s[i]  
+  "string.rkt":        no_prefix // for String and s[i]
+  "range.rkt":         no_prefix // for -- and end
   "racket-for.rkt":    no_prefix
-  rhombus/macro: no_prefix
+  "macro.rkt":         no_prefix // displayln on compile time
+  rhombus/macro:       no_prefix // for defining dot provider
                
-  racket/base:         prefix rkt
+  racket/base:         prefix base
   "racket-regexp.rkt": prefix re
   "racket-string.rkt": prefix string
   "racket-file.rkt":   prefix file
@@ -34,14 +37,22 @@ defn.macro '(defs:
       ...
   )
 
-
 // Helpers
 
-val apply:   rkt.apply
+val apply:   base.apply
 val map:     list.map
+def length:  base.length
+def append:  base.append
 val foreach: list.for_each
+fun sum(xs): base.foldl((fun(a,b):a+b),0,xs)
+
+def is_string: string.is_string
+fun findall(pattern, string): re.match_all(pattern, string)                              
+fun regexp(ss):   apply(re.pregexp, ss)
+fun stringify(x): if is_string(x) | x | string.from_char(x)
+
 fun add1(x): x+1           
-fun sum(xs): rkt.foldl((fun(a,b):a+b),0,xs)
+
 fun max(xs, ~key: f): // assumes that xs is non-empty
   def mutable x0: xs[0]
   def mutable k0: 0
@@ -54,11 +65,8 @@ fun max(xs, ~key: f): // assumes that xs is non-empty
                 xs)
   x0
 
-fun findall(pattern, string): re.match_all(pattern, string)                              
-fun regexp(ss):   apply(re.pregexp, ss)
 fun open(path):   file.open(path)        // Note: path can't be renamed to file here
 fun read(a_port): port.to_string(a_port)
-fun stringify(x): if string.is_string(x) | x | string.from_char(x)                          
 
 // Problem: how to define the nary case?
 operator (a ++ b):
@@ -67,8 +75,34 @@ operator (a ++ b):
   string.append(stringify(a),stringify(b))
 
 
-// Counters
-                  
+// String Dot Provider
+// If s is annotated with String, then we can use s.length etc
+// The Rhombus standard library will at some point have
+// a String annotation. This is temporary.
+
+// Note: Don't use `x is_a String` in the predicate. That's an infinite loop.
+annotation.macro 'String:
+  annotation_ct.pack_predicate('is_string,
+                               '(($(dot_ct.provider_key), string_dot_provider)))
+dot.macro '(string_dot_provider $left $dot $right):
+  match right
+  // One argument functions
+  | 'length:       '(string.length($left))
+  | 'is_non_empty: '(string.is_non_empty($left))
+  | 'is_empty:     '(string.is_empty($left))
+  | 'downcase:     '(string.downcase($left))
+  // More arguments
+  | 'append:       '(fun (more): string.appends(cons($left,[more]))) // variadic? how?
+
+// def s: "foo" :: String
+// s.length
+// s.append("bar")
+
+
+/// Counters
+
+// TODO: Use maps here.
+
 class Counter(keys, hash)
 
 fun values(counter):          hash.values(counter.hash)
@@ -86,11 +120,14 @@ fun new_counter(keys) :
 ///
 /// The Spelling Corrector
 ///
- 
+
+// The original spelling corrector is in Python.
+// I have kept the original in order to compare.
+
 // def words(text): return re.findall(r'\w+', text.lower())
 //   > words("foo bar baz")
 //   ["foo", "bar", "baz"] 
-def words(text): findall(@regexp{\w+}, string.downcase(text))
+def words(text::String): findall(@regexp{\w+}, text.downcase)
 
 // def WORDS: words(read(open("big.txt")))
 // def WORDS: new_counter(words(read(open("small.txt"))))
@@ -120,7 +157,7 @@ def candidates(word):
 //    return set(w for w in words if w in WORDS)
 def known(words) :
   fun pred(word) : hash.ref(WORDS.hash,word,#false)
-  def ks: for_list_when(word,words, pred(word), word)
+  def ks: for_list_when(word, words, pred(word), word)
   list.is_non_empty(ks) && set.to_list(ks)
 
 // def edits1(word):
@@ -133,16 +170,16 @@ def known(words) :
 //    inserts    = [L + c + R               for L, R in splits for c in letters]
 //    return set(deletes + transposes + replaces + inserts)
 
-def edits1(word):
-  def ok(s)     : string.is_non_empty(s)
-  def clean(xs) : rkt.filter((fun(x): x),xs)
+def edits1(word :: String):
+  def ok(s::String) : s.is_non_empty
+  def clean(xs)     : base.filter((fun(x): x),xs)
   defs:
     letters:    "abcdefghijklmnopqrstuvwxyz"
-    splits:     for_list(i, list.range(string.length(word)+1), [word[~to:i], word[~from:i]])
-    deletes:    for_list(s, splits,(fun(List(L,R)):                ok(R) && L++R[~from:1])(s))
-    transposes: for_list(s, splits,(fun(List(L,R)):  string.length(R)>1  && L++R[1]++R[0]++R[~from:2])(s))
-    replaces:   for_list(s, splits,(fun(List(L,R)):                ok(R) && for_list(c,letters,L++c++R[~from:1]))(s))
-    inserts:    for_list(s, splits,(fun(List(L,R)):                         for_list(c,letters,L++c++R))(s))
+    splits:     for_list(i, list.range(word.length+1), [word[--i], word[i--end]])
+    deletes:    for_list(s, splits, (fun(List(L,R)):                ok(R) && L++R[1--end])(s))
+    transposes: for_list(s, splits, (fun(List(L,R::String)):  R.length>1  && L++R[1]++R[0]++R[2--end])(s))
+    replaces:   for_list(s, splits, (fun(List(L,R)):                ok(R) && for_list(c,letters, L++c++R[1--end]))(s))
+    inserts:    for_list(s, splits, (fun(List(L,R)):                         for_list(c,letters, L++c++R))(s))
   set.from_list(clean(list.flatten([deletes, transposes, replaces, inserts])))
 
 // def edits2(word): 

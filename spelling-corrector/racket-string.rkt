@@ -6,6 +6,7 @@
 
 (provide
  (rename-out [string-append     append]
+             [string-append*    appends]
              [string-downcase   downcase]
              [string-length     length]
              [string-ref        ref]
